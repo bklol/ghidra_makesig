@@ -19,6 +19,10 @@ MAKE_SIG_AT = collections.OrderedDict([
 
 BytePattern = collections.namedtuple('BytePattern', ['is_wildcard', 'byte'])
 
+def __bytepattern_origin_str(self):
+	# return an Original binary search string
+	return '{:02X}'.format(self.byte)
+    
 def __bytepattern_ida_str(self):
 	# return an IDA-style binary search string
 	return '{:02X}'.format(self.byte) if not self.is_wildcard else '?'
@@ -30,7 +34,8 @@ def __bytepattern_sig_str(self):
 def __bytepattern_mask_str(self):
 	# return a Mask byte signature
 	return r'x' if not self.is_wildcard else r'?'
-
+    
+BytePattern.origin_str = __bytepattern_origin_str
 BytePattern.ida_str = __bytepattern_ida_str
 BytePattern.sig_str = __bytepattern_sig_str
 BytePattern.mask_str = __bytepattern_mask_str
@@ -141,7 +146,8 @@ def process(start_at = MAKE_SIG_AT['fn']):
 	else:
 		cleanupWilds(byte_pattern)
 		print("Signature for", fn.getName())
-		print(*(b.ida_str() for b in byte_pattern))
+		print("Origin: ",*(b.origin_str() for b in byte_pattern))
+		print("IDA: ",*(b.ida_str() for b in byte_pattern))
 		print("".join(b.sig_str() for b in byte_pattern))
 		print("".join(b.mask_str() for b in byte_pattern))
 
