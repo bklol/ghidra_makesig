@@ -19,10 +19,6 @@ MAKE_SIG_AT = collections.OrderedDict([
 
 BytePattern = collections.namedtuple('BytePattern', ['is_wildcard', 'byte'])
 
-def __bytepattern_origin_str(self):
-	# return an Original binary search string
-	return '{:02X}'.format(self.byte)
-    
 def __bytepattern_ida_str(self):
 	# return an IDA-style binary search string
 	return '{:02X}'.format(self.byte) if not self.is_wildcard else '?'
@@ -34,8 +30,7 @@ def __bytepattern_sig_str(self):
 def __bytepattern_mask_str(self):
 	# return a Mask byte signature
 	return r'x' if not self.is_wildcard else r'?'
-    
-BytePattern.origin_str = __bytepattern_origin_str
+
 BytePattern.ida_str = __bytepattern_ida_str
 BytePattern.sig_str = __bytepattern_sig_str
 BytePattern.mask_str = __bytepattern_mask_str
@@ -61,20 +56,20 @@ def getMaskedInstruction(ins):
 	Returns a generator that outputs either a byte to match or None if the byte should be masked.
 	"""
 	# print(ins)
-	
+
 	# resulting mask should match the instruction length
 	mask = [0] * ins.length
-	
+
 	proto = ins.getPrototype()
 	# iterate over operands and mask bytes
 	for op in range(proto.getNumOperands()):
 		# dumpOperandInfo(ins, op)
-		
+
 		# TODO deal with partial byte masks
 		if shouldMaskOperand(ins, op):
 			mask = [ m | v & 0xFF for m, v in zip(mask, proto.getOperandValueMask(op).getBytes()) ]
 	# print('  ' + str(mask))
-	
+
 	for m, b in zip(mask, ins.getBytes()):
 		if m == 0xFF:
 			# we only check for fully masked bytes at the moment
@@ -98,17 +93,17 @@ def process(start_at = MAKE_SIG_AT['fn']):
 		ins = cm.getInstructionAt(fn.getEntryPoint())
 	elif start_at == MAKE_SIG_AT['cursor']:
 		ins = cm.getInstructionContaining(currentAddress)
-	
+
 	if not ins:
 		raise Exception("Could not find entry point to function")
 
 	pattern = "" # contains pattern string (supports regular expressions)
 	byte_pattern = [] # contains BytePattern instances
-	
+
 	# keep track of our matches
 	matches = []
 	match_limit = 1280
-	
+
 	while fm.getFunctionContaining(ins.getAddress()) == fn:
 		for entry in getMaskedInstruction(ins):
 			byte_pattern.append(entry)
@@ -116,16 +111,16 @@ def process(start_at = MAKE_SIG_AT['fn']):
 				pattern += '.'
 			else:
 				pattern += r'\x{:02x}'.format(entry.byte)
-		
+
 		expected_next = ins.getAddress().add(ins.length)
 		ins = ins.getNext()
-		
+
 		if ins.getAddress() != expected_next:
 			# we don't have a good way to deal with alignment bytes
 			# raise an exception for now
 			raise Exception("Instruction at %s is not adjacent"
 					" to previous (expected %s)" % (expected_next, ins.getAddress()))
-		
+
 		if 0 < len(matches) < match_limit:
 			# we have all the remaining matches, start only searching those addresses
 			match_set = AddressSet()
@@ -135,10 +130,10 @@ def process(start_at = MAKE_SIG_AT['fn']):
 		else:
 			# the matches are sorted in ascending order, so the first match will be the start
 			matches = findBytes(matches[0] if len(matches) else None, pattern, match_limit)
-		
+
 		if len(matches) < 2:
 			break
-	
+
 	if not len(matches) == 1:
 		print(*(b.ida_str() for b in byte_pattern))
 		print('Signature matched', len(matches), 'locations:', *(matches))
@@ -146,8 +141,7 @@ def process(start_at = MAKE_SIG_AT['fn']):
 	else:
 		cleanupWilds(byte_pattern)
 		print("Signature for", fn.getName())
-		print("Origin: ",*(b.origin_str() for b in byte_pattern))
-		print("IDA: ",*(b.ida_str() for b in byte_pattern))
+		print(*(b.ida_str() for b in byte_pattern))
 		print("".join(b.sig_str() for b in byte_pattern))
 		print("".join(b.mask_str() for b in byte_pattern))
 
